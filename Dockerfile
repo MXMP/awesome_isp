@@ -13,4 +13,4 @@ RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
 EXPOSE 80
 
 # Run core.py when the container launches
-CMD ["python", "core.py"]
+CMD ["python3", "core.py"]
