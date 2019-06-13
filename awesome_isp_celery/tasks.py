@@ -16,3 +16,8 @@ def longtime_add(x, y):
 @app.task
 def ping_host(hostname):
     return subprocess.run(['ping', '-q', '-c', '1', hostname]).returncode
+
+
+@app.task(bind=True, name='save_host', queue='minio')
+def save_host(host):
+    pass
