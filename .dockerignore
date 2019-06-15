@@ -1,0 +1,7 @@
+.gitignore
+Dockerfile
+README.md
+map_preview.png
+*.pyc
+*.yml
+venv/

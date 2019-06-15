@@ -1,4 +1,4 @@
-import time
+import os
 import subprocess
 
 from pymongo import MongoClient
@@ -20,7 +20,7 @@ def ping_host(hostname):
 
 @app.task
 def get_model(ip_address):
-    session = Session(hostname=ip_address, community='readonly', version=2)
+    session = Session(hostname=ip_address, community=os.environ['READ_COMMUNITY'], version=2)
     sys_descr = session.get('.1.3.6.1.2.1.1.1.0')
     for model in models:
         if model in sys_descr:
@@ -34,7 +34,7 @@ def get_model(ip_address):
 
 @app.task(bind=True, name='save_host')
 def save_host(ip_address, model, status, lldp_info):
-    mongo = MongoClient('mongodb://localhost:27017')
+    mongo = MongoClient(os.environ['MONGO_HOST'])
     hosts = mongo.awesome_isp_hosts
     host = {"ip": ip_address,
             "model": model,
