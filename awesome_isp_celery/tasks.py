@@ -6,7 +6,7 @@ from pymongo import MongoClient
 from easysnmp import Session
 from celery.utils.log import get_task_logger
 
-from awesome_isp_celery.worker import app
+from worker import app
 
 logger = get_task_logger(__name__)
 
@@ -17,7 +17,7 @@ models = ['DES-3200-28/C1',
 
 
 @app.task(bind=True, name='discover_hosts')
-def discover_hosts(networks):
+def discover_hosts(self, networks):
     for net in networks:
         network = ip_network(net)
         hosts = network.hosts()
@@ -26,7 +26,7 @@ def discover_hosts(networks):
 
 
 @app.task(bind=True, name='check_host')
-def check_host(hostname):
+def check_host(self, hostname):
     logger.info(f'Check host: {hostname}')
     session = Session(hostname=hostname, community=os.environ['READ_COMMUNITY'], version=2)
     sys_descr = session.get('.1.3.6.1.2.1.1.1.0')
@@ -45,17 +45,17 @@ def check_host(hostname):
 
 
 @app.task(bind=True, name='ping_host')
-def ping_host(hostname):
+def ping_host(self, hostname):
     return subprocess.run(['ping', '-q', '-c', '1', hostname]).returncode
 
 
 @app.task(bind=True, name='save_host')
-def save_host(ip_address, model, status, lldp_info):
+def save_host(self, ip_address, model, status, lldp_info):
     mongo = MongoClient(os.environ['MONGO_HOST'])
     db = mongo.awesome_isp
     hosts = db.hosts
-    host = {"ip": ip_address,
-            "model": model,
-            "status": status,
-            "lldp_info": lldp_info}
-    hosts.insert_one(host)
+    hosts.find_one_and_update({'ip': ip_address},
+                              {'$set': {'status': status,
+                                        'model': model,
+                                        'lldp_info': lldp_info}},
+                              upsert=True)

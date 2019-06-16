@@ -3,7 +3,7 @@ services:
   worker:
     build: .
     image: &img awesome_isp_worker
-    command: [celery, worker, --app=worker.app, --loglevel=info]
+    command: [celery, worker, --app=worker.app, --pool=gevent, --concurrency=20, --loglevel=info]
     environment: &env
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672
       - READ_COMMUNITY=readonly
@@ -26,6 +26,19 @@ services:
     depends_on:
       - rabbitmq
     restart: 'no'
+    volumes:
+      - ./awesome_isp_celery:/app
+
+  flower:
+    build: .
+    image: *img
+    command: [celery, --app=worker.app, flower]
+    environment: *env
+    depends_on:
+      - worker
+    restart: 'no'
+    ports:
+      - "5555:5555"
     volumes:
       - ./awesome_isp_celery:/app
 
