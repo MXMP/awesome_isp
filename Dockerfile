@@ -1,4 +1,5 @@
 FROM mxmp/python-netsnmp:python3
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONUNBUFFERED=1
 
 WORKDIR /
 COPY requirements.txt ./

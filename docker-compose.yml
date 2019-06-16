@@ -2,15 +2,32 @@ version: '3'
 services:
   worker:
     build: .
-    image: awesome_isp_worker
-    command: [celery, worker, --app=awesome_isp_celery, --loglevel=info]
-    environment:
+    image: &img awesome_isp_worker
+    command: [celery, worker, --app=worker.app, --loglevel=info]
+    environment: &env
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672
       - READ_COMMUNITY=readonly
-      - MONGO_HOST=mongodb://mongo:27017
+      - MONGO_HOST=mongodb://root:example@mongo:27017
+      - SCHEDULE_TIME=300.0
+      - NETWORKS_TO_DISCOVER=10.99.192.0/24,172.17.88.0/24
     depends_on:
-      - mongo
       - rabbitmq
+      - beat
+      - mongo
+    restart: 'no'
+    volumes:
+      - ./awesome_isp_celery:/app
+
+  beat:
+    build: .
+    image: *img
+    command: [celery, beat, --app=worker.app, --loglevel=info]
+    environment: *env
+    depends_on:
+      - rabbitmq
+    restart: 'no'
+    volumes:
+      - ./awesome_isp_celery:/app
 
   mongo:
     image: mongo
