@@ -1,2 +1,5 @@
 /venv
 /.idea
+/mongo_data
+*.pid
+*.db
