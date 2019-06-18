@@ -53,3 +53,10 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management
+
+  web:
+    image: nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./awesome_isp_web:/usr/share/nginx/html
