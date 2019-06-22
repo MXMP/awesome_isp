@@ -17,6 +17,7 @@ services:
     restart: 'no'
     volumes:
       - ./awesome_isp_celery:/app
+      - ./awesome_isp_web:/usr/share/nginx/html
 
   beat:
     build: .
@@ -28,6 +29,7 @@ services:
     restart: 'no'
     volumes:
       - ./awesome_isp_celery:/app
+      - ./awesome_isp_web:/usr/share/nginx/html
 
   flower:
     build: .

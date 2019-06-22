@@ -11,4 +11,8 @@ app.conf.beat_schedule = {
         'schedule': float(os.environ['SCHEDULE_TIME']),
         'args': (os.environ['NETWORKS_TO_DISCOVER'].split(','),),
     },
+    'make_json_map': {
+        'task': 'make_json',
+        'schedule': float(os.environ['SCHEDULE_TIME']),
+    },
 }

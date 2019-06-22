@@ -1,5 +1,6 @@
 import os
 import subprocess
+import json
 from ipaddress import ip_network
 
 from pymongo import MongoClient
@@ -59,3 +60,16 @@ def save_host(self, ip_address, model, status, lldp_info):
                                         'model': model,
                                         'lldp_info': lldp_info}},
                               upsert=True)
+
+
+@app.task(bind=True, name='make_json')
+def make_json(self):
+    mongo = MongoClient(os.environ['MONGO_HOST'])
+    db = mongo.awesome_isp
+    hosts = db.hosts
+    nodes = []
+    links = []
+    for host in hosts.find():
+        nodes.append({"id": host.ip, "model": host.model, "group": "switches", "radius": 2})
+    with open("/app/awesome_isp_web/graph.json") as graph_file:
+        json.dump({"hosts": hosts, "links": links}, graph_file)
