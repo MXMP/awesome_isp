@@ -83,7 +83,7 @@
                     .call(drag(simulation));
 
                 node.append("title")
-                    .text(d => d.id);
+                    .text(d => d.ip);
 
                 simulation.on("tick", () => {
                     link

@@ -90,6 +90,7 @@ def ping_host(self, hostname):
 
 @app.task(bind=True, name='save_host')
 def save_host(self, id, ip_address, model, status, lldp_nbrs):
+    # TODO: переделать это на нормальную версию, а то переопределения получаются ненужные
     mongo = MongoClient(os.environ['MONGO_HOST'])
     db = mongo.awesome_isp
     hosts = db.hosts
@@ -122,5 +123,10 @@ def make_json(self):
                       "model": host['model'],
                       "group": "switches",
                       "radius": 2})
+        for nbr in host['lldp_nbrs']:
+            if hosts.find({'id': nbr}).count() != 0:
+                links.append({'source': host['id'],
+                              'target': nbr,
+                              'value': 2})
     with open("/usr/share/nginx/html/graph.json", "w") as graph_file:
         json.dump({"nodes": nodes, "links": links}, graph_file)
