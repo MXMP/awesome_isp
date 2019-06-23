@@ -31,6 +31,15 @@ def discover_hosts(self, networks):
             check_host.s(host.compressed).delay()
 
 
+@app.task(bind=True, name='discover_nbrs')
+def discover_nbrs(self):
+    mongo = MongoClient(os.environ['MONGO_HOST'])
+    db = mongo.awesome_isp
+    hosts = db.hosts
+    for host in hosts.find():
+        get_lldp_info.s(host['ip']).delay()
+
+
 @app.task(bind=True, name='check_host')
 def check_host(self, hostname):
     logger.info(f'Check host: {hostname}')
@@ -68,10 +77,10 @@ def get_lldp_info(self, hostname):
     logger.info(f'Getting LLDP for host: {hostname}')
     session = Session(hostname=hostname, community=os.environ['READ_COMMUNITY'], version=2)
     nbr_mac_addresses = session.walk('.1.0.8802.1.1.2.1.4.1.1.5')
+    nbrs = []
     for entry in nbr_mac_addresses:
-        # TODO: доделать сохранение информации в БД
-        print(mac_bin_to_hex(entry.value))
-    return
+        nbrs.append(mac_bin_to_hex(entry.value))
+    update_nbrs.s(hostname, nbrs).delay()
 
 
 @app.task(bind=True, name='ping_host')
@@ -90,6 +99,14 @@ def save_host(self, id, ip_address, model, status, lldp_nbrs):
                                         'model': model,
                                         'lldp_nbrs': lldp_nbrs}},
                               upsert=True)
+
+
+@app.task(bind=True, name='update_nbrs')
+def update_nbrs(self, hostname, nbrs):
+    mongo = MongoClient(os.environ['MONGO_HOST'])
+    db = mongo.awesome_isp
+    hosts = db.hosts
+    hosts.find_one_and_update({'ip': hostname}, {'$set': {'lldp_nbrs': nbrs}})
 
 
 @app.task(bind=True, name='make_json')

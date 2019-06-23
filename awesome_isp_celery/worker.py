@@ -15,4 +15,8 @@ app.conf.beat_schedule = {
         'task': 'make_json',
         'schedule': float(os.environ['SCHEDULE_TIME']),
     },
+    'discover_nbrs': {
+        'task': 'discover_nbrs',
+        'schedule': float(os.environ['SCHEDULE_TIME']),
+    }
 }
