@@ -70,6 +70,6 @@ def make_json(self):
     nodes = []
     links = []
     for host in hosts.find():
-        nodes.append({"id": host.ip, "model": host.model, "group": "switches", "radius": 2})
-    with open("/app/awesome_isp_web/graph.json") as graph_file:
-        json.dump({"hosts": hosts, "links": links}, graph_file)
+        nodes.append({"id": host['ip'], "model": host['model'], "group": "switches", "radius": 2})
+    with open("/usr/share/nginx/html/graph.json", "w") as graph_file:
+        json.dump({"nodes": nodes, "links": links}, graph_file)
