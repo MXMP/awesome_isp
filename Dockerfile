@@ -1,16 +1,10 @@
 FROM mxmp/python-netsnmp:python3
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 PYTHONUNBUFFERED=1
 
-# Set the working directory to /app
-WORKDIR /app
+WORKDIR /
+COPY requirements.txt ./
+RUN pip3 install --no-cache-dir --trusted-host pypi.python.org -r requirements.txt
+RUN rm requirements.txt
 
-# Copy the current directory contents into the container at /app
 COPY . /app
-
-# Install any needed packages specified in requdirements.txt
-RUN pip3 install --trusted-host pypi.python.org -r requirements.txt
-
-# Make port 80 available to the world outside this container
-EXPOSE 80
-
-# Run core.py when the container launches
-CMD ["python", "core.py"]
+WORKDIR /app
