@@ -93,11 +93,13 @@ def save_host(self, id, **kwargs):
     mongo = MongoClient(os.environ['MONGO_HOST'])
     db = mongo.awesome_isp
     hosts = db.hosts
+    on_insert = {'status': 'ok',
+                 'model': 'unknown'}
+    if 'lldp_nbrs' not in kwargs:
+        on_insert['lldp_nbrs'] = []
     hosts.find_one_and_update({'id': id},
-                              {'$set': {**kwargs},
-                               '$setOnInsert': {'status': 'ok',
-                                                'model': 'unknown',
-                                                'lldp_nbrs': []}},
+                              {'$set': kwargs,
+                               '$setOnInsert': on_insert},
                               upsert=True)
 
 
