@@ -9,7 +9,7 @@ services:
       - READ_COMMUNITY=readonly
       - MONGO_HOST=mongodb://root:example@mongo:27017
       - SCHEDULE_TIME=300.0
-      - NETWORKS_TO_DISCOVER=10.99.192.0/24,172.17.88.0/24
+      - NETWORKS_TO_DISCOVER=10.99.120.0/24,10.99.192.0/24
     depends_on:
       - rabbitmq
       - beat
