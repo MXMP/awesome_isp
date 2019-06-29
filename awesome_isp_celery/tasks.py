@@ -33,11 +33,12 @@ def discover_hosts(self, networks):
 
 @app.task(bind=True, name='discover_nbrs')
 def discover_nbrs(self):
-    mongo = MongoClient(os.environ['MONGO_HOST'])
+    mongo = MongoClient(os.environ['MONGO_HOST'], connect=False)
     db = mongo.awesome_isp
     hosts = db.hosts
     for host in hosts.find():
         get_lldp_info.s(host['id'], host['ip']).delay()
+    mongo.close()
 
 
 @app.task(bind=True, name='check_host')
@@ -90,7 +91,7 @@ def ping_host(self, hostname):
 
 @app.task(bind=True, name='save_host')
 def save_host(self, id, **kwargs):
-    mongo = MongoClient(os.environ['MONGO_HOST'])
+    mongo = MongoClient(os.environ['MONGO_HOST'], connect=False)
     db = mongo.awesome_isp
     hosts = db.hosts
     on_insert = {'status': 'ok',
@@ -101,11 +102,12 @@ def save_host(self, id, **kwargs):
                               {'$set': kwargs,
                                '$setOnInsert': on_insert},
                               upsert=True)
+    mongo.close()
 
 
 @app.task(bind=True, name='make_json')
 def make_json(self):
-    mongo = MongoClient(os.environ['MONGO_HOST'])
+    mongo = MongoClient(os.environ['MONGO_HOST'], connect=False)
     db = mongo.awesome_isp
     hosts = db.hosts
     nodes = []
@@ -121,5 +123,6 @@ def make_json(self):
                 links.append({'source': host['id'],
                               'target': nbr,
                               'value': 2})
+    mongo.close()
     with open("/usr/share/nginx/html/graph.json", "w") as graph_file:
         json.dump({"nodes": nodes, "links": links}, graph_file)
