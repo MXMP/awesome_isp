@@ -50,8 +50,9 @@ def check_host(self, hostname):
     except EasySNMPTimeoutError:
         logger.info(f'Host {hostname} is down.')
     else:
-        save_host.s(mac_bin_to_hex(local_chassis_id.value), ip=hostname).delay()
-        return
+        chassis_id = mac_bin_to_hex(local_chassis_id.value)
+        save_host.s(chassis_id, ip=hostname).delay()
+        check_model.s(chassis_id, hostname).delay()
 
 
 @app.task(bind=True, name='check_model')
@@ -77,16 +78,19 @@ def check_model(self, id, hostname):
 def get_lldp_info(self, id, hostname):
     logger.info(f'Getting LLDP for host: {hostname}')
     session = Session(hostname=hostname, community=os.environ['READ_COMMUNITY'], version=2)
-    nbr_mac_addresses = session.walk('.1.0.8802.1.1.2.1.4.1.1.5')
-    nbrs = []
-    for entry in nbr_mac_addresses:
-        nbrs.append(mac_bin_to_hex(entry.value))
-    save_host.s(id, lldp_nbrs=nbrs).delay()
-
-
-@app.task(bind=True, name='ping_host')
-def ping_host(self, hostname):
-    return subprocess.run(['ping', '-q', '-c', '1', hostname]).returncode
+    try:
+        nbr_mac_addresses = session.walk('.1.0.8802.1.1.2.1.4.1.1.5')
+    except EasySNMPTimeoutError:
+        save_host.s(id, status='down').delay()
+    else:
+        nbrs = []
+        for entry in nbr_mac_addresses:
+            try:
+                nbrs.append(mac_bin_to_hex(entry.value))
+            except IndexError:
+                logger.error(f'Error while convert MAC: {entry.value}')
+                continue
+        save_host.s(id, lldp_nbrs=nbrs).delay()
 
 
 @app.task(bind=True, name='save_host')
@@ -95,12 +99,15 @@ def save_host(self, id, **kwargs):
     db = mongo.awesome_isp
     hosts = db.hosts
     on_insert = {'status': 'ok',
+                 'lldp_nbrs': [],
                  'model': 'unknown'}
-    if 'lldp_nbrs' not in kwargs:
-        on_insert['lldp_nbrs'] = []
+    for key in kwargs:
+        if key in on_insert:
+            on_insert.pop(key)
     hosts.find_one_and_update({'id': id},
                               {'$set': kwargs,
-                               '$setOnInsert': on_insert},
+                               '$setOnInsert': on_insert,
+                               '$currentDate': {'last_check': True}},
                               upsert=True)
     mongo.close()
 
