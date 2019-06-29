@@ -1,5 +1,8 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache">
+<meta http-equiv="expires" content="0">
+<meta http-equiv="pragma" content="no-cache">
 <title>Force-Directed Graph</title>
 <style>
 
@@ -79,11 +82,11 @@
                     .data(nodes)
                     .join("circle")
                     .attr("r", 5)
-                    .attr("fill", "green")
+                    .attr("fill", d => (d.status === 'ok') ? 'green' : "red")
                     .call(drag(simulation));
 
                 node.append("title")
-                    .text(d => d.ip);
+                    .text(d => d.ip + ': ' + d.model);
 
                 simulation.on("tick", () => {
                     link

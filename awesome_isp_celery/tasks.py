@@ -33,11 +33,12 @@ def discover_hosts(self, networks):
 
 @app.task(bind=True, name='discover_nbrs')
 def discover_nbrs(self):
-    mongo = MongoClient(os.environ['MONGO_HOST'])
+    mongo = MongoClient(os.environ['MONGO_HOST'], connect=False)
     db = mongo.awesome_isp
     hosts = db.hosts
     for host in hosts.find():
-        get_lldp_info.s(host['ip']).delay()
+        get_lldp_info.s(host['id'], host['ip']).delay()
+    mongo.close()
 
 
 @app.task(bind=True, name='check_host')
@@ -49,70 +50,71 @@ def check_host(self, hostname):
     except EasySNMPTimeoutError:
         logger.info(f'Host {hostname} is down.')
     else:
-        save_host.s(mac_bin_to_hex(local_chassis_id.value), hostname, 'unknown', 'ok', {}).delay()
-        return
+        chassis_id = mac_bin_to_hex(local_chassis_id.value)
+        save_host.s(chassis_id, ip=hostname).delay()
+        check_model.s(chassis_id, hostname).delay()
 
 
 @app.task(bind=True, name='check_model')
-def check_model(self, hostname):
+def check_model(self, id, hostname):
     logger.info(f'Check model: {hostname}')
     session = Session(hostname=hostname, community=os.environ['READ_COMMUNITY'], version=2)
     sys_descr = session.get('.1.3.6.1.2.1.1.1.0')
     logger.info(f'sysDescr: {sys_descr}')
     for model in models:
         if model in sys_descr.value:
-            save_host.s(hostname, model, 'ok', {}).delay()
+            save_host.s(id, model=model).delay()
             return
 
     sys_name = session.get('.1.3.6.1.2.1.1.5.0')
     logger.info(f'sysName: {sys_name}')
     for model in models:
         if model in sys_name.value:
-            save_host.s(hostname, model, 'ok', {}).delay()
+            save_host.s(id, model=model).delay()
             return
 
 
 @app.task(bind=True, name='get_lldp_info')
-def get_lldp_info(self, hostname):
+def get_lldp_info(self, id, hostname):
     logger.info(f'Getting LLDP for host: {hostname}')
     session = Session(hostname=hostname, community=os.environ['READ_COMMUNITY'], version=2)
-    nbr_mac_addresses = session.walk('.1.0.8802.1.1.2.1.4.1.1.5')
-    nbrs = []
-    for entry in nbr_mac_addresses:
-        nbrs.append(mac_bin_to_hex(entry.value))
-    update_nbrs.s(hostname, nbrs).delay()
-
-
-@app.task(bind=True, name='ping_host')
-def ping_host(self, hostname):
-    return subprocess.run(['ping', '-q', '-c', '1', hostname]).returncode
+    try:
+        nbr_mac_addresses = session.walk('.1.0.8802.1.1.2.1.4.1.1.5')
+    except EasySNMPTimeoutError:
+        save_host.s(id, status='down').delay()
+    else:
+        nbrs = []
+        for entry in nbr_mac_addresses:
+            try:
+                nbrs.append(mac_bin_to_hex(entry.value))
+            except IndexError:
+                logger.error(f'Error while convert MAC: {entry.value}')
+                continue
+        save_host.s(id, lldp_nbrs=nbrs).delay()
 
 
 @app.task(bind=True, name='save_host')
-def save_host(self, id, ip_address, model, status, lldp_nbrs):
-    # TODO: переделать это на нормальную версию, а то переопределения получаются ненужные
-    mongo = MongoClient(os.environ['MONGO_HOST'])
+def save_host(self, id, **kwargs):
+    mongo = MongoClient(os.environ['MONGO_HOST'], connect=False)
     db = mongo.awesome_isp
     hosts = db.hosts
+    on_insert = {'status': 'ok',
+                 'lldp_nbrs': [],
+                 'model': 'unknown'}
+    for key in kwargs:
+        if key in on_insert:
+            on_insert.pop(key)
     hosts.find_one_and_update({'id': id},
-                              {'$set': {'ip': ip_address,
-                                        'status': status,
-                                        'model': model,
-                                        'lldp_nbrs': lldp_nbrs}},
+                              {'$set': kwargs,
+                               '$setOnInsert': on_insert,
+                               '$currentDate': {'last_check': True}},
                               upsert=True)
-
-
-@app.task(bind=True, name='update_nbrs')
-def update_nbrs(self, hostname, nbrs):
-    mongo = MongoClient(os.environ['MONGO_HOST'])
-    db = mongo.awesome_isp
-    hosts = db.hosts
-    hosts.find_one_and_update({'ip': hostname}, {'$set': {'lldp_nbrs': nbrs}})
+    mongo.close()
 
 
 @app.task(bind=True, name='make_json')
 def make_json(self):
-    mongo = MongoClient(os.environ['MONGO_HOST'])
+    mongo = MongoClient(os.environ['MONGO_HOST'], connect=False)
     db = mongo.awesome_isp
     hosts = db.hosts
     nodes = []
@@ -121,6 +123,7 @@ def make_json(self):
         nodes.append({"id": host['id'],
                       "ip": host['ip'],
                       "model": host['model'],
+                      "status": host['status'],
                       "group": "switches",
                       "radius": 2})
         for nbr in host['lldp_nbrs']:
@@ -128,5 +131,6 @@ def make_json(self):
                 links.append({'source': host['id'],
                               'target': nbr,
                               'value': 2})
+    mongo.close()
     with open("/usr/share/nginx/html/graph.json", "w") as graph_file:
         json.dump({"nodes": nodes, "links": links}, graph_file)
