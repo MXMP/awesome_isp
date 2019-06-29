@@ -86,7 +86,7 @@
                     .call(drag(simulation));
 
                 node.append("title")
-                    .text(d => d.ip);
+                    .text(d => d.ip + ': ' + d.model);
 
                 simulation.on("tick", () => {
                     link
