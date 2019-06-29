@@ -2,7 +2,7 @@ version: '3'
 services:
   worker:
     build: .
-    image: &img awesome_isp_worker
+    image: &img mxmp/awesome_isp_worker
     command: [celery, worker, --app=worker.app, --pool=gevent, --concurrency=20, --loglevel=info]
     environment: &env
       - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672
