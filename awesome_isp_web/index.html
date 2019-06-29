@@ -82,7 +82,7 @@
                     .data(nodes)
                     .join("circle")
                     .attr("r", 5)
-                    .attr("fill", "green")
+                    .attr("fill", d => (d.status === 'ok') ? 'green' : "red")
                     .call(drag(simulation));
 
                 node.append("title")

@@ -116,6 +116,7 @@ def make_json(self):
         nodes.append({"id": host['id'],
                       "ip": host['ip'],
                       "model": host['model'],
+                      "status": host['status'],
                       "group": "switches",
                       "radius": 2})
         for nbr in host['lldp_nbrs']:
